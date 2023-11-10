@@ -8,11 +8,6 @@ import os
 import json
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
-prices = {
-    '1024x1024': 0.04,
-    '1024x1792': 0.08,
-    '1792x1024': 0.08
-}
 api_url = 'https://api.openai.com/v1/images/generations'
 config = 'config.json'
 
@@ -62,9 +57,17 @@ def generate_text(text):
 
 
 def calculate_price(size, hd):
-    base = prices[size]
-    # if hd, just 2x it
-    price = base * 2 if hd else base
+    prices = {
+        '1024x1024': 0.04,
+        '1024x1792': 0.08,
+        '1792x1024': 0.08
+    }
+    hd_prices = {
+        '1024x1024': 0.08,
+        '1024x1792': 0.12,
+        '1792x1024': 0.12
+    }
+    price = hd_prices[size] if hd else prices[size]
     return price
 
 
