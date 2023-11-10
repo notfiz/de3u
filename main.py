@@ -1,20 +1,42 @@
 import gradio as gr
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import io
 import base64
 import matplotlib
+import os
+import json
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
+prices = {
+    '1024x1024': 0.04,
+    '1024x1792': 0.08,
+    '1792x1024': 0.08
+}
 api_url = 'https://api.openai.com/v1/images/generations'
+config = 'config.json'
 
 matplotlib.use('Agg')
 
 
-def generate_error_image(error_text):
-    img_width = 400
-    img_height = 100
-    img = Image.new('RGB', (img_width, img_height), color='black')
+def load_config():
+    if os.path.exists(config):
+        with open(config, 'r') as file:
+            data = json.load(file)
+            return data.get('api_key', ''), data.get('total_spent', 0)
+    return '', 0
+
+
+def save_config(api, total):
+    with open(config, 'w') as file:
+        json.dump({'api_key': api, 'total_spent': f"{total:.2f}"}, file)
+        file.flush()
+
+
+def generate_text(text):
+    width = 400
+    height = 100
+    img = Image.new('RGB', (width, height), color='black')
     draw = ImageDraw.Draw(img)
     font_size = 20
     font_path = 'arial.ttf'
@@ -23,87 +45,110 @@ def generate_error_image(error_text):
         font = ImageFont.truetype(font_path, size=font_size)
     except IOError:
         font = ImageFont.load_default()
-    text_width, text_height = draw.textbbox((0, 0), error_text, font=font)[2:]
+    width, height = draw.textbbox((0, 0), text, font=font)[2:]
 
-    while text_width > img_width:
+    while width > width:
         font_size -= 1
         if font_size <= 5:
-            raise ValueError(f"Text({error_text}) cannot be accommodated, even with the smallest font size.")
+            generate_text("none")
         font = ImageFont.truetype(font_path, size=font_size)
-        text_width, text_height = draw.textbbox((0, 0), error_text, font=font)[2:]
+        width, height = draw.textbbox((0, 0), text, font=font)[2:]
 
-    text_x = (img_width - text_width) // 2
-    text_y = (img_height - text_height) // 2
+    x = (img.width - width) // 2
+    y = (img.height - height) // 2
 
-    draw.text((text_x, text_y), error_text, font=font, fill='white')
+    draw.text((x, y), text, font=font, fill='white')
     return img
+
+
+def calculate_price(size, hd):
+    base = prices[size]
+    # if hd, just 2x it
+    price = base * 2 if hd else base
+    return price
+
+
+def request_dalle(api_key, prompt, hd, size, style):
+    data = {
+        "model": "dall-e-3",
+        "prompt": prompt,
+        "size": size,
+        "quality": "hd" if hd else "standard",
+        "style": style if style else "vivid",
+        "response_format": "b64_json"
+    }
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+    try:
+        response = requests.post(api_url, json=data, headers=headers)
+        return response.status_code, response.json()
+    except Exception as e:
+        print("error:", e)
+        return None, e
 
 
 def generate_image(api_key, prompt, hd, size, style):
     print("generating...")
-    try:
+    status, response = request_dalle(api_key, prompt, hd, size, style)
 
-        data = {
-            "model": "dall-e-3",
-            "prompt": prompt,
-            "size": size,
-            "quality": "hd" if hd else "standard",
-            "style": style if style else "vivid",
-            "response_format": "b64_json"
-        }
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
-        }
-        response = requests.post(api_url, json=data, headers=headers)
-        response_json = response.json()
+    if status is None:
+        return generate_text("connection issue"), response, 0
 
-        if response.status_code == 200:
-            b64_content = response_json['data'][0]['b64_json']
-            revised_prompt = response_json['data'][0].get('revised_prompt', 'No revised prompt provided.')
+    if status == 200:
+        b64_content = response['data'][0]['b64_json']
+        revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
+        image_bytes = base64.b64decode(b64_content)
+        image = Image.open(io.BytesIO(image_bytes))
+        # metadata stuff
+        metadata = PngImagePlugin.PngInfo()
+        metadata.add_text("generation_info", f"prompt:{prompt}, hd:{hd}, style:{style}")
+        metadata.add_text("revised_prompt", revised_prompt)
+        buffer = io.BytesIO()
+        image.save(buffer, "PNG", pnginfo=metadata)
+        buffer.seek(0)
+        img_final = Image.open(buffer)
+        # price calculations
+        price = calculate_price(size, hd)
+        _, total = load_config()
+        total += price
+        save_config(api_key, total)
+        return img_final, revised_prompt, f"${price:.2f}, total:${total:.2f}"
 
-            # output is in base64 format we need to convert it
-            image_bytes = base64.b64decode(b64_content)
-            image = Image.open(io.BytesIO(image_bytes))
-            return image, revised_prompt
+    elif status == 401:
+        return generate_text("Invalid API key"), "Invalid API key.", 0
 
-        elif response.status_code == 401:
-            return generate_error_image("Invalid API key."), "Invalid API key."
+    elif status == 400 or status == 429:
+        error_message = response['error']['message']
+        # filtered
+        if response['error']['code'] == "content_policy_violation":
+            print(f"Filtered.")
+            return generate_text("Filtered"), error_message, 0
+        # rate limited or quota issue
+        print(f"Error: {error_message}")
+        return generate_text(f"{error_message}"), f"{error_message}", 0
 
-        elif response.status_code == 400 or response.status_code == 429:
-            error_message = response_json['error']['message']
-            if response_json['error']['code'] == "content_policy_violation":
-                print(f"Filtered.")
-                return generate_error_image("Filtered"), error_message
-            else:
-                print(f"Error: {error_message}")
-                return generate_error_image(f"{error_message}"), f"{error_message}"
-
-        else:
-            print(f"Failed to generate image: {response.text}")
-            return generate_error_image(f"Unknown Error"), f"{response.text}"
-
-    # this should never get triggered but you never know
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        print(e)
-        return generate_error_image("An unexpected error occurred")
+    else:
+        print(f"Unknown error: {response}")
+        return generate_text(f"Unknown Error"), f"{response}", 0
 
 
 iface = gr.Interface(
     fn=generate_image,
     inputs=[
-        gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password"),
+        gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password", value=load_config()[0]),
         gr.Textbox(label="Prompt", placeholder="Enter your prompt here..."),
         gr.Checkbox(label="HD mode"),
         gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0]),
         gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+
     ],
     outputs=[
         gr.Image(),
-        gr.Textbox(label="Revised Prompt")],
+        gr.Textbox(label="Revised Prompt"),
+        gr.Textbox(label="Price")],
     title="de3u",
 )
 
-# Run the Gradio app
 iface.launch()
