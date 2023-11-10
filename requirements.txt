@@ -1,0 +1,4 @@
+gradio
+requests
+Pillow
+matplotlib
