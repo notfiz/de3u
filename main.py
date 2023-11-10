@@ -33,11 +33,11 @@ def save_config(api, total):
 
 
 def generate_text(text):
-    width = 400
-    height = 100
+    width = 1000
+    height = 250
     img = Image.new('RGB', (width, height), color='black')
     draw = ImageDraw.Draw(img)
-    font_size = 20
+    font_size = 30
     font_path = 'arial.ttf'
 
     try:
@@ -60,7 +60,7 @@ def generate_text(text):
     return img
 
 
-def calculate_price(size, hd):
+def calculate_price(size, hd, count=1):
     prices = {
         '1024x1024': 0.04,
         '1024x1792': 0.08,
@@ -72,7 +72,7 @@ def calculate_price(size, hd):
         '1792x1024': 0.12
     }
     price = hd_prices[size] if hd else prices[size]
-    return price
+    return (price * count)
 
 
 def request_dalle(api_key, prompt, hd, size, style):
@@ -147,30 +147,30 @@ def generate_image(api_key, prompt, hd, size, style):
 
 def main(api_key, prompt, hd, size, style, count):
     images = []
-    revised_prompts = []
+    revised_prompts = ""
     count = int(count)
     price = 0
 
     for i in range(count):
         img_final, revised_prompt, success = generate_image(api_key, prompt, hd, size, style)
         images.append(img_final)
-        revised_prompts.append(revised_prompt)
+        revised_prompts += f"{i+1}- {revised_prompt}\n"
         if success:
             price += calculate_price(size, hd)
 
     _, total = load_config()
     total += price
     save_config(api_key, total)
-    return images, revised_prompts, f"price for this batch:${price:.2f}, overall total:${total:.2f}"
+    return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
 
-with gr.Blocks(title="d3su") as demo:
-    gr.Markdown("# d3su")
+with gr.Blocks(title="de3u") as demo:
+    gr.Markdown("# de3u")
     with gr.Row():
         with gr.Column():
-            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password", value=load_config()[0])
-            prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt here...")
-            hd_input = gr.Checkbox(label="HD mode")
+            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key...", type="password", value=load_config()[0])
+            prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt...")
+            hd_input = gr.Checkbox(label="HD")
             size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
             style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
             with gr.Row():
