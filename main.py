@@ -10,15 +10,19 @@ import json
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 api_url = 'https://api.openai.com/v1/images/generations'
 config = 'config.json'
+output = 'output'
 
 matplotlib.use('Agg')
+os.makedirs(output, exist_ok=True)
 
 
 def load_config():
     if os.path.exists(config):
         with open(config, 'r') as file:
             data = json.load(file)
-            return data.get('api_key', ''), data.get('total_spent', 0)
+            api_key = data.get('api_key', '')
+            total_spent = float(data.get('total_spent', 0))
+            return api_key, total_spent
     return '', 0
 
 
@@ -42,7 +46,7 @@ def generate_text(text):
         font = ImageFont.load_default()
     width, height = draw.textbbox((0, 0), text, font=font)[2:]
 
-    while width > width:
+    while width > img.width:
         font_size -= 1
         if font_size <= 5:
             generate_text("none")
@@ -97,7 +101,8 @@ def generate_image(api_key, prompt, hd, size, style):
     status, response = request_dalle(api_key, prompt, hd, size, style)
 
     if status is None:
-        return generate_text("connection issue"), response, 0
+        print(f"Error: {response}")
+        return generate_text("connection issue"), response, False
 
     if status == 200:
         b64_content = response['data'][0]['b64_json']
@@ -112,55 +117,73 @@ def generate_image(api_key, prompt, hd, size, style):
         image.save(buffer, "PNG", pnginfo=metadata)
         buffer.seek(0)
         img_final = Image.open(buffer)
-        # price calculations
-        price = calculate_price(size, hd)
-        _, total = load_config()
-        total += price
-        save_config(api_key, total)
-        return img_final, revised_prompt, f"${price:.2f}, total:${total:.2f}"
+        # saving stuff
+        file_number = 0
+        while os.path.exists(f"{output}/image_{file_number}.png"):
+            file_number += 1
+        img_final.save(f"{output}/image_{file_number}.png", "PNG", pnginfo=metadata)
+
+        print("success.")
+        return img_final, revised_prompt, True
 
     elif status == 401:
-        return generate_text("Invalid API key"), "Invalid API key.", 0
+        print("Invalid api key.")
+        return generate_text("Invalid API key"), "Invalid API key.", False
 
     elif status == 400 or status == 429:
         error_message = response['error']['message']
         # filtered
         if response['error']['code'] == "content_policy_violation":
             print(f"Filtered.")
-            return generate_text("Filtered"), error_message, 0
+            return generate_text("Filtered"), error_message, False
         # rate limited or quota issue
         print(f"Error: {error_message}")
-        return generate_text(f"{error_message}"), f"{error_message}", 0
+        return generate_text(f"{error_message}"), f"{error_message}", False
 
     else:
         print(f"Unknown error: {response}")
-        return generate_text(f"Unknown Error"), f"{response}", 0
+        return generate_text(f"Unknown Error"), f"{response}", False
 
 
-# this function is stupid for now but will be useful later
-def main(api_key, prompt, hd, size, style):
-    img_final, revised_prompt, price_info = generate_image(api_key, prompt, hd, size, style)
-    return img_final, revised_prompt, price_info
+def main(api_key, prompt, hd, size, style, count):
+    images = []
+    revised_prompts = []
+    count = int(count)
+    price = 0
+
+    for i in range(count):
+        img_final, revised_prompt, success = generate_image(api_key, prompt, hd, size, style)
+        images.append(img_final)
+        revised_prompts.append(revised_prompt)
+        if success:
+            price += calculate_price(size, hd)
+
+    _, total = load_config()
+    total += price
+    save_config(api_key, total)
+    return images, revised_prompts, f"price for this batch:${price:.2f}, overall total:${total:.2f}"
 
 
-with gr.Blocks() as demo:
+with gr.Blocks(title="d3su") as demo:
+    gr.Markdown("# d3su")
     with gr.Row():
         with gr.Column():
-            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password",
-                                       value=load_config()[0])
+            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password", value=load_config()[0])
             prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt here...")
             hd_input = gr.Checkbox(label="HD mode")
-            size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0])
+            size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
             style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
-            generate_button = gr.Button("Generate")
+            with gr.Row():
+                generate_button = gr.Button("Generate")
+                num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
         with gr.Column():
-            image_output = gr.Image()
+            image_output = gr.Gallery()
             revised_prompt_output = gr.Textbox(label="Revised Prompt")
             price_output = gr.Textbox(label="Price")
 
     generate_button.click(
         fn=main,
-        inputs=[api_key_input, prompt_input, hd_input, size_input, style_input],
+        inputs=[api_key_input, prompt_input, hd_input, size_input, style_input, num_images_input],
         outputs=[image_output, revised_prompt_output, price_output]
     )
 
