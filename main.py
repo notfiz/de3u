@@ -137,21 +137,31 @@ def generate_image(api_key, prompt, hd, size, style):
         return generate_text(f"Unknown Error"), f"{response}", 0
 
 
-iface = gr.Interface(
-    fn=generate_image,
-    inputs=[
-        gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password", value=load_config()[0]),
-        gr.Textbox(label="Prompt", placeholder="Enter your prompt here..."),
-        gr.Checkbox(label="HD mode"),
-        gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0]),
-        gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+# this function is stupid for now but will be useful later
+def main(api_key, prompt, hd, size, style):
+    img_final, revised_prompt, price_info = generate_image(api_key, prompt, hd, size, style)
+    return img_final, revised_prompt, price_info
 
-    ],
-    outputs=[
-        gr.Image(),
-        gr.Textbox(label="Revised Prompt"),
-        gr.Textbox(label="Price")],
-    title="de3u",
-)
 
-iface.launch()
+with gr.Blocks() as demo:
+    with gr.Row():
+        with gr.Column():
+            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key here...", type="password",
+                                       value=load_config()[0])
+            prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt here...")
+            hd_input = gr.Checkbox(label="HD mode")
+            size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0])
+            style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+            generate_button = gr.Button("Generate")
+        with gr.Column():
+            image_output = gr.Image()
+            revised_prompt_output = gr.Textbox(label="Revised Prompt")
+            price_output = gr.Textbox(label="Price")
+
+    generate_button.click(
+        fn=main,
+        inputs=[api_key_input, prompt_input, hd_input, size_input, style_input],
+        outputs=[image_output, revised_prompt_output, price_output]
+    )
+
+demo.launch()
