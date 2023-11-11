@@ -92,7 +92,6 @@ def request_dalle(api_key, prompt, hd, size, style):
         response = requests.post(api_url, json=data, headers=headers)
         return response.status_code, response.json()
     except Exception as e:
-        print("error:", e)
         return None, e
 
 
@@ -130,12 +129,20 @@ def generate_image(api_key, prompt, hd, size, style):
         print("Invalid api key.")
         return generate_text("Invalid API key"), "Invalid API key.", False
 
+    # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
+    # image: This request has been blocked by our content filters.
     elif status == 400 or status == 429:
         error_message = response['error']['message']
         # filtered
         if response['error']['code'] == "content_policy_violation":
-            print(f"Filtered.")
+            if "Your prompt may contain text" in error_message:
+                print("Filtered by text moderation")
+            elif "blocked by our content filters" in error_message:
+                print("Filtered by image moderation")
+            else:
+                print(f"Filtered. {error_message}")
             return generate_text("Filtered"), error_message, False
+
         # rate limited or quota issue
         print(f"Error: {error_message}")
         return generate_text(f"{error_message}"), f"{error_message}", False
