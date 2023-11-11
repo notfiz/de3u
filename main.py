@@ -6,6 +6,7 @@ import base64
 import matplotlib
 import os
 import json
+import datetime
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 api_url = 'https://api.openai.com/v1/images/generations'
@@ -117,10 +118,15 @@ def generate_image(api_key, prompt, hd, size, style):
         buffer.seek(0)
         img_final = Image.open(buffer)
         # saving stuff
+        folder_path = os.path.join(output, datetime.datetime.now().strftime('%Y-%m-%d'))
+        os.makedirs(folder_path, exist_ok=True)
+
         file_number = 0
-        while os.path.exists(f"{output}/img_{file_number}.png"):
+        file_path = os.path.join(folder_path, f"img_{file_number}.png")
+        while os.path.exists(file_path):
             file_number += 1
-        img_final.save(f"{output}/img_{file_number}.png", "PNG", pnginfo=metadata)
+            file_path = os.path.join(folder_path, f"img_{file_number}.png")
+        img_final.save(file_path, "PNG", pnginfo=metadata)
 
         print("Success.")
         return img_final, revised_prompt, True
@@ -168,6 +174,7 @@ def main(api_key, prompt, hd, size, style, count):
     _, total = load_config()
     total += price
     save_config(api_key, total)
+    print("Done.")
     return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
 
