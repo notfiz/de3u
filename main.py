@@ -72,7 +72,7 @@ def calculate_price(size, hd, count=1):
         '1792x1024': 0.12
     }
     price = hd_prices[size] if hd else prices[size]
-    return (price * count)
+    return price * count
 
 
 def request_dalle(api_key, prompt, hd, size, style):
@@ -119,11 +119,11 @@ def generate_image(api_key, prompt, hd, size, style):
         img_final = Image.open(buffer)
         # saving stuff
         file_number = 0
-        while os.path.exists(f"{output}/image_{file_number}.png"):
+        while os.path.exists(f"{output}/img_{file_number}.png"):
             file_number += 1
-        img_final.save(f"{output}/image_{file_number}.png", "PNG", pnginfo=metadata)
+        img_final.save(f"{output}/img_{file_number}.png", "PNG", pnginfo=metadata)
 
-        print("success.")
+        print("Success.")
         return img_final, revised_prompt, True
 
     elif status == 401:
