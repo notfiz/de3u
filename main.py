@@ -2,14 +2,13 @@ import gradio as gr
 import requests
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import io
-import base64
 import matplotlib
 import os
 import json
 import datetime
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
-api_url = 'https://api.openai.com/v1/images/generations'
+openai_url = 'https://api.openai.com/v1/images/generations'
 config = 'config.json'
 output = 'output'
 
@@ -25,13 +24,14 @@ def load_config():
             data = json.load(file)
             api_key = data.get('api_key', '')
             total_spent = float(data.get('total_spent', 0))
-            return api_key, total_spent
-    return '', 0
+            proxy_url = data.get('proxy_url', '')
+            return api_key, total_spent, proxy_url
+    return '', 0, ''
 
 
-def save_config(api, total):
+def save_config(api, total, proxy_url):
     with open(config, 'w') as file:
-        json.dump({'api_key': api, 'total_spent': f"{total:.2f}"}, file)
+        json.dump({'api_key': api, 'total_spent': f"{total:.2f}", 'proxy_url': proxy_url}, file)
         file.flush()
 
 
@@ -96,43 +96,54 @@ def cancel_toggle():
     cancel = not cancel
 
 
-def request_dalle(api_key, prompt, hd, size, style):
+def request_dalle(url, api_key, prompt, hd, size, style):
     data = {
         "model": "dall-e-3",
         "prompt": prompt,
         "size": size,
         "quality": "hd" if hd else "standard",
         "style": style if style else "vivid",
-        "response_format": "b64_json"
+        # disabled since khanon reverse proxy doesn't seem to support this
+        # "response_format": "b64_json"
     }
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {api_key}'
     }
     try:
-        response = requests.post(api_url, json=data, headers=headers)
+        response = requests.post(url, json=data, headers=headers)
         return response.status_code, response.json()
     except Exception as e:
         return None, e
 
 
-def generate_image(api_key, prompt, hd, jb, size, style):
+def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     print("generating...")
     if jb:
         # openai docs
         prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:" + prompt
 
-    status, response = request_dalle(api_key, prompt, hd, size, style)
+    if proxy_url == '':
+        status, response = request_dalle(openai_url, api_key, prompt, hd, size, style)
+    else:
+        status, response = request_dalle(proxy_url, api_key, prompt, hd, size, style)
 
     if status is None:
         print(f"Error: {response}")
         return generate_text("connection issue"), response, False
 
     if status == 200:
-        b64_content = response['data'][0]['b64_json']
         revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
-        image_bytes = base64.b64decode(b64_content)
-        image = Image.open(io.BytesIO(image_bytes))
+        image_url = response['data'][0]['url']
+        try:
+            image_response = requests.get(image_url)
+            image_response.raise_for_status()
+            image_bytes = image_response.content
+            image = Image.open(io.BytesIO(image_bytes))
+        except requests.RequestException as e:
+            print(f"Error fetching image from URL: {e}\n URL:{image_url}")
+            return generate_text("Error fetching image"), str(e), False
+
         # metadata stuff
         metadata = PngImagePlugin.PngInfo()
         metadata.add_text("generation_info", f"prompt:{prompt}, hd:{hd}, style:{style}")
@@ -182,7 +193,7 @@ def generate_image(api_key, prompt, hd, jb, size, style):
         return generate_text(f"Unknown Error"), f"{response}", False
 
 
-def main(api_key, prompt, hd, jb, size, style, count):
+def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     images = []
     revised_prompts = ""
     count = int(count)
@@ -195,15 +206,16 @@ def main(api_key, prompt, hd, jb, size, style, count):
             print("operation cancelled.")
             cancel_toggle()
             break
-        img_final, revised_prompt, success = generate_image(api_key, prompt, hd, jb, size, style)
+
+        img_final, revised_prompt, success = generate_image(proxy_url, api_key, prompt, hd, jb, size, style)
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
             price += calculate_price(size, hd)
 
-    _, total = load_config()
+    _, total, _ = load_config()
     total += price
-    save_config(api_key, total)
+    save_config(api_key, total, proxy_url)
     print("Done.")
     return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
@@ -215,6 +227,7 @@ with gr.Blocks(title="de3u") as demo:
     with tab_main:
         with gr.Row():
             with gr.Column():
+                proxy_url_input = gr.Textbox(label="Proxy Link", placeholder="Enter proxy link if needed", value=load_config()[2])
                 api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
                 prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
                 hd_input = gr.Checkbox(label="HD")
@@ -244,7 +257,7 @@ with gr.Blocks(title="de3u") as demo:
 
     generate_button.click(
         fn=main,
-        inputs=[api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
+        inputs=[proxy_url_input, api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
         outputs=[image_output, revised_prompt_output, price_output]
     )
     cancel_button.click(
