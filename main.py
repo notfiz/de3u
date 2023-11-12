@@ -16,7 +16,7 @@ output = 'output'
 matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
 
-metadata_fetching = False
+cancel = False
 
 
 def load_config():
@@ -87,6 +87,11 @@ def get_metadata(img):
     revised_prompt = img.info.get("revised_prompt", "No revised prompt found.")
     metadata_str += "Revised Prompt:\n" + revised_prompt + "\n"
     return metadata_str
+
+
+def cancel_toggle():
+    global cancel
+    cancel = not cancel
 
 
 def request_dalle(api_key, prompt, hd, size, style):
@@ -180,8 +185,14 @@ def main(api_key, prompt, hd, jb, size, style, count):
     revised_prompts = ""
     count = int(count)
     price = 0
+    if cancel:
+        cancel_toggle()
 
     for i in range(count):
+        if cancel:
+            print("operation cancelled.")
+            cancel_toggle()
+            break
         img_final, revised_prompt, success = generate_image(api_key, prompt, hd, jb, size, style)
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
@@ -210,6 +221,7 @@ with gr.Blocks(title="de3u") as demo:
                 style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
                 with gr.Row():
                     generate_button = gr.Button("Generate")
+                    cancel_button = gr.Button("Cancel")
                     num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
             with gr.Column():
                 image_output = gr.Gallery()
@@ -232,6 +244,9 @@ with gr.Blocks(title="de3u") as demo:
         fn=main,
         inputs=[api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
         outputs=[image_output, revised_prompt_output, price_output]
+    )
+    cancel_button.click(
+        fn=cancel_toggle,
     )
 
 demo.launch()
