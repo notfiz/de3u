@@ -91,6 +91,8 @@ def get_metadata(img):
 
 def cancel_toggle():
     global cancel
+    if not cancel:
+        print("Canceling... please wait")
     cancel = not cancel
 
 
@@ -233,13 +235,13 @@ with gr.Blocks(title="de3u") as demo:
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
 
-        metadata_button = gr.Button("Get Metadata")
-
-    metadata_button.click(
+    metadata_image.change(
         fn=get_metadata,
         inputs=[metadata_image],
-        outputs=[metadata_output]
+        outputs=[metadata_output],
+        show_progress="hidden"
     )
+
     generate_button.click(
         fn=main,
         inputs=[api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
