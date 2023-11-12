@@ -159,9 +159,9 @@ def generate_image(api_key, prompt, hd, jb, size, style):
         # filtered
         if response['error']['code'] == "content_policy_violation":
             if "Your prompt may contain text" in error_message:
-                print("Filtered by text moderation")
-            elif "blocked by our content filters" in error_message:
-                print("Filtered by image moderation")
+                print("Filtered by text moderation. You need to modify your prompt.")
+            elif "Image descriptions generated" in error_message:
+                print("Filtered by image moderation. Your request may succeed if retried.")
             else:
                 print(f"Filtered. {error_message}")
             return generate_text("Filtered"), error_message, False
@@ -213,7 +213,7 @@ with gr.Blocks(title="de3u") as demo:
                     num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
             with gr.Column():
                 image_output = gr.Gallery()
-                revised_prompt_output = gr.Textbox(label="Revised Prompt")
+                revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
                 price_output = gr.Textbox(label="Price")
 
     with tab_metadata:
