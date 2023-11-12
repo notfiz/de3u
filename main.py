@@ -16,6 +16,8 @@ output = 'output'
 matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
 
+metadata_fetching = False
+
 
 def load_config():
     if os.path.exists(config):
@@ -50,7 +52,7 @@ def generate_text(text):
     while width > img.width:
         font_size -= 1
         if font_size <= 5:
-            generate_text("none")
+            return generate_text("none")
         font = ImageFont.truetype(font_path, size=font_size)
         width, height = draw.textbbox((0, 0), text, font=font)[2:]
 
@@ -74,6 +76,17 @@ def calculate_price(size, hd, count=1):
     }
     price = hd_prices[size] if hd else prices[size]
     return price * count
+
+
+def get_metadata(img):
+    metadata_str = ""
+    if img is None:
+        return ""
+    generation_info = img.info.get("generation_info", "No metadata found.")
+    metadata_str += "Generation Info:\n" + generation_info + "\n"
+    revised_prompt = img.info.get("revised_prompt", "No revised prompt found.")
+    metadata_str += "Revised Prompt:\n" + revised_prompt + "\n"
+    return metadata_str
 
 
 def request_dalle(api_key, prompt, hd, size, style):
@@ -167,7 +180,7 @@ def main(api_key, prompt, hd, size, style, count):
     for i in range(count):
         img_final, revised_prompt, success = generate_image(api_key, prompt, hd, size, style)
         images.append(img_final)
-        revised_prompts += f"{i+1}- {revised_prompt}\n"
+        revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
             price += calculate_price(size, hd)
 
@@ -180,21 +193,36 @@ def main(api_key, prompt, hd, size, style, count):
 
 with gr.Blocks(title="de3u") as demo:
     gr.Markdown("# de3u")
-    with gr.Row():
-        with gr.Column():
-            api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key...", type="password", value=load_config()[0])
-            prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt...")
-            hd_input = gr.Checkbox(label="HD")
-            size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
-            style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
-            with gr.Row():
-                generate_button = gr.Button("Generate")
-                num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
-        with gr.Column():
-            image_output = gr.Gallery()
-            revised_prompt_output = gr.Textbox(label="Revised Prompt")
-            price_output = gr.Textbox(label="Price")
+    tab_main = gr.TabItem("Image generator")
+    tab_metadata = gr.TabItem("Image Metadata")
+    with tab_main:
+        with gr.Row():
+            with gr.Column():
+                api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
+                prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
+                hd_input = gr.Checkbox(label="HD")
+                size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
+                style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+                with gr.Row():
+                    generate_button = gr.Button("Generate")
+                    num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
+            with gr.Column():
+                image_output = gr.Gallery()
+                revised_prompt_output = gr.Textbox(label="Revised Prompt")
+                price_output = gr.Textbox(label="Price")
 
+    with tab_metadata:
+        with gr.Row():
+            metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
+            metadata_output = gr.Textbox(label="Metadata", interactive=False)
+
+        metadata_button = gr.Button("Get Metadata")
+
+    metadata_button.click(
+        fn=get_metadata,
+        inputs=[metadata_image],
+        outputs=[metadata_output]
+    )
     generate_button.click(
         fn=main,
         inputs=[api_key_input, prompt_input, hd_input, size_input, style_input, num_images_input],
