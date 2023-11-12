@@ -109,8 +109,12 @@ def request_dalle(api_key, prompt, hd, size, style):
         return None, e
 
 
-def generate_image(api_key, prompt, hd, size, style):
+def generate_image(api_key, prompt, hd, jb, size, style):
     print("generating...")
+    if jb:
+        # openai docs
+        prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:" + prompt
+
     status, response = request_dalle(api_key, prompt, hd, size, style)
 
     if status is None:
@@ -171,14 +175,14 @@ def generate_image(api_key, prompt, hd, size, style):
         return generate_text(f"Unknown Error"), f"{response}", False
 
 
-def main(api_key, prompt, hd, size, style, count):
+def main(api_key, prompt, hd, jb, size, style, count):
     images = []
     revised_prompts = ""
     count = int(count)
     price = 0
 
     for i in range(count):
-        img_final, revised_prompt, success = generate_image(api_key, prompt, hd, size, style)
+        img_final, revised_prompt, success = generate_image(api_key, prompt, hd, jb, size, style)
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
@@ -201,6 +205,7 @@ with gr.Blocks(title="de3u") as demo:
                 api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
                 prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
                 hd_input = gr.Checkbox(label="HD")
+                jb_input = gr.Checkbox(label="JB", info="makes the ai less likely to change your input. more likely to get filtered. useful if you are using an already revised prompt.")
                 size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
                 style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
                 with gr.Row():
@@ -225,7 +230,7 @@ with gr.Blocks(title="de3u") as demo:
     )
     generate_button.click(
         fn=main,
-        inputs=[api_key_input, prompt_input, hd_input, size_input, style_input, num_images_input],
+        inputs=[api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
         outputs=[image_output, revised_prompt_output, price_output]
     )
 
