@@ -1,4 +1,9 @@
 # de3u
-basic de3 frontend.
+simple de3 frontend.
 
-install python and `pip install -r requirements.txt` then run `main.py`
+# how to use
+1.install python 
+
+2.`pip install -r requirements.txt`
+
+3.run `main.py`
