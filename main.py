@@ -35,31 +35,28 @@ def save_config(api, total, proxy_url):
         file.flush()
 
 
-def generate_text(text):
-    width = 1000
-    height = 250
-    img = Image.new('RGB', (width, height), color='black')
+def generate_text(text, width=1000, height=250, color='black', font_color='white'):
+    img = Image.new('RGB', (width, height), color=color)
     draw = ImageDraw.Draw(img)
-    font_size = 30
+    font_size = 50
     font_path = 'arial.ttf'
 
     try:
         font = ImageFont.truetype(font_path, size=font_size)
     except IOError:
         font = ImageFont.load_default()
-    width, height = draw.textbbox((0, 0), text, font=font)[2:]
 
-    while width > img.width:
+    text_width, text_height = draw.textbbox((0, 0), text, font=font)[2:]
+    while text_width > img.width - 20:
         font_size -= 1
         if font_size <= 5:
             return generate_text("none")
         font = ImageFont.truetype(font_path, size=font_size)
-        width, height = draw.textbbox((0, 0), text, font=font)[2:]
+        text_width, text_height = draw.textbbox((0,0), text, font=font)[2:]
 
-    x = (img.width - width) // 2
-    y = (img.height - height) // 2
-
-    draw.text((x, y), text, font=font, fill='white')
+    x = (img.width - text_width) / 2
+    y = (img.height - text_height) / 2
+    draw.text((x, y), text, font=font, fill=font_color)
     return img
 
 
@@ -121,7 +118,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     print("generating...")
     if jb:
         # openai docs
-        prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:" + prompt
+        prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS: " + prompt
 
     if proxy_url == '':
         status, response = request_dalle(openai_url, api_key, prompt, hd, size, style)
@@ -220,14 +217,14 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
 
-with gr.Blocks(title="de3u") as demo:
+with gr.Blocks(title="de3u") as instance:
     gr.Markdown("# de3u")
     tab_main = gr.TabItem("Image generator")
     tab_metadata = gr.TabItem("Image Metadata")
     with tab_main:
         with gr.Row():
             with gr.Column():
-                proxy_url_input = gr.Textbox(label="Proxy Link", placeholder="Enter proxy link if needed", value=load_config()[2])
+                proxy_url_input = gr.Textbox(label="Reverse proxy Link", placeholder="Enter reverse proxy link if needed", value=load_config()[2])
                 api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
                 prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
                 hd_input = gr.Checkbox(label="HD")
@@ -264,4 +261,4 @@ with gr.Blocks(title="de3u") as demo:
         fn=cancel_toggle,
     )
 
-demo.launch()
+instance.launch()
