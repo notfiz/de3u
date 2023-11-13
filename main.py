@@ -6,8 +6,6 @@ import matplotlib
 import os
 import json
 import datetime
-import subprocess
-import sys
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -35,17 +33,6 @@ def save_config(api, total, proxy_url):
     with open(config, 'w') as file:
         json.dump({'api_key': api, 'total_spent': f"{total:.2f}", 'proxy_url': proxy_url}, file)
         file.flush()
-
-
-def open_output_folder():
-    folder_path = os.path.join(output, datetime.datetime.now().strftime('%Y-%m-%d'))
-    if sys.platform == "win32":
-        os.startfile(folder_path)
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", folder_path])
-    else:
-        # linux
-        subprocess.Popen(["xdg-open", folder_path])
 
 
 def generate_text(text, width=1000, height=250, color='black', font_color='white'):
@@ -279,7 +266,6 @@ with gr.Blocks(title="de3u") as instance:
                 image_output = gr.Gallery()
                 revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
                 price_output = gr.Textbox(label="Price")
-                open_folder_button = gr.Button("Open Output Folder")
     with tab_metadata:
         with gr.Row():
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
@@ -298,11 +284,6 @@ with gr.Blocks(title="de3u") as instance:
     )
     cancel_button.click(
         fn=cancel_toggle,
-    )
-    open_folder_button.click(
-        fn=open_output_folder,
-        inputs=[],
-        outputs=[]
     )
 
 instance.launch(inbrowser=True)

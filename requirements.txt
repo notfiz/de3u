@@ -2,4 +2,3 @@ gradio
 requests
 Pillow
 matplotlib
-disutils
