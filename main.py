@@ -78,11 +78,26 @@ def calculate_price(size, hd, count=1):
 def get_metadata(img):
     metadata_str = ""
     if img is None:
-        return ""
-    generation_info = img.info.get("generation_info", "No metadata found.")
-    metadata_str += "Generation Info:\n" + generation_info + "\n"
-    revised_prompt = img.info.get("revised_prompt", "No revised prompt found.")
-    metadata_str += "Revised Prompt:\n" + revised_prompt + "\n"
+        return "No image provided."
+    generation_info_raw = img.info.get("generation_info", "")
+    revised_prompt = img.info.get("revised_prompt", "")
+    try:
+        if generation_info_raw:
+            generation_info = json.loads(generation_info_raw)
+            metadata_str += "Generation Info:\n"
+            for key, value in generation_info.items():
+                metadata_str += f"{key}: {value}\n"
+        else:
+            metadata_str += "No generation info found.\n"
+    except json.JSONDecodeError:
+        # older/unsupported generation info
+        metadata_str += generation_info_raw + "\n"
+
+    if revised_prompt:
+        metadata_str += "\n\nRevised Prompt:\n" + revised_prompt
+    else:
+        metadata_str += "\n\nNo revised prompt found."
+
     return metadata_str
 
 
@@ -146,7 +161,13 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
 
         # metadata stuff
         metadata = PngImagePlugin.PngInfo()
-        metadata.add_text("generation_info", f"prompt:{prompt}, hd:{hd}, style:{style}")
+        generation_info_data = {
+            "prompt": prompt,
+            "size": size,
+            "hd": hd,
+            "style": style,
+        }
+        metadata.add_text("generation_info", json.dumps(json.dumps(generation_info_data)))
         metadata.add_text("revised_prompt", revised_prompt)
         buffer = io.BytesIO()
         image.save(buffer, "PNG", pnginfo=metadata)
