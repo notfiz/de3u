@@ -305,4 +305,4 @@ with gr.Blocks(title="de3u") as instance:
         outputs=[]
     )
 
-instance.launch()
+instance.launch(inbrowser=True)
