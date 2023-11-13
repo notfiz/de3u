@@ -52,7 +52,7 @@ def generate_text(text, width=1000, height=250, color='black', font_color='white
         if font_size <= 5:
             return generate_text("none")
         font = ImageFont.truetype(font_path, size=font_size)
-        text_width, text_height = draw.textbbox((0,0), text, font=font)[2:]
+        text_width, text_height = draw.textbbox((0, 0), text, font=font)[2:]
 
     x = (img.width - text_width) / 2
     y = (img.height - text_height) / 2
@@ -167,7 +167,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             "hd": hd,
             "style": style,
         }
-        metadata.add_text("generation_info", json.dumps(json.dumps(generation_info_data)))
+        metadata.add_text("generation_info", json.dumps(generation_info_data))
         metadata.add_text("revised_prompt", revised_prompt)
         buffer = io.BytesIO()
         image.save(buffer, "PNG", pnginfo=metadata)
@@ -275,7 +275,6 @@ with gr.Blocks(title="de3u") as instance:
         outputs=[metadata_output],
         show_progress="hidden"
     )
-
     generate_button.click(
         fn=main,
         inputs=[proxy_url_input, api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
