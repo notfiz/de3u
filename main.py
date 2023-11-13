@@ -123,6 +123,8 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     if proxy_url == '':
         status, response = request_dalle(openai_url, api_key, prompt, hd, size, style)
     else:
+        proxy_url = proxy_url.rstrip("/")
+        proxy_url += '/v1/images/generations'
         status, response = request_dalle(proxy_url, api_key, prompt, hd, size, style)
 
     if status is None:
