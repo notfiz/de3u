@@ -1,5 +1,5 @@
 # de3u
-simple de3 frontend.
+DALL.E-3 frontend with reverse proxy support
 
 # how to use
 1.install python 
