@@ -100,8 +100,6 @@ def request_dalle(url, api_key, prompt, hd, size, style):
         "size": size,
         "quality": "hd" if hd else "standard",
         "style": style if style else "vivid",
-        # disabled since khanon reverse proxy doesn't seem to support this
-        # "response_format": "b64_json"
     }
     headers = {
         'Content-Type': 'application/json',
@@ -115,6 +113,7 @@ def request_dalle(url, api_key, prompt, hd, size, style):
 
 
 def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
+    proxy = False
     print("generating...")
     if jb:
         # openai docs
@@ -123,6 +122,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     if proxy_url == '':
         status, response = request_dalle(openai_url, api_key, prompt, hd, size, style)
     else:
+        proxy = True
         proxy_url = proxy_url.rstrip("/")
         proxy_url += '/v1/images/generations'
         status, response = request_dalle(proxy_url, api_key, prompt, hd, size, style)
@@ -140,7 +140,8 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             image_bytes = image_response.content
             image = Image.open(io.BytesIO(image_bytes))
         except requests.RequestException as e:
-            print(f"Error fetching image from URL: {e}\n URL:{image_url}")
+            # should make this automatically retry the request a few times before failing later
+            print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser")
             return generate_text("Error fetching image"), str(e), False
 
         # metadata stuff
@@ -175,9 +176,9 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         error_message = response['error']['message']
         # filtered
         if response['error']['code'] == "content_policy_violation":
-            if "Your prompt may contain text" in error_message:
+            if "Your prompt may contain text" in error_message and not proxy:
                 print("Filtered by text moderation. You need to modify your prompt.")
-            elif "Image descriptions generated" in error_message:
+            elif "Image descriptions generated" in error_message and not proxy:
                 print("Filtered by image moderation. Your request may succeed if retried.")
             else:
                 print(f"Filtered. {error_message}")
