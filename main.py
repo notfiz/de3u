@@ -209,9 +209,12 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         print(f"Error: {error_message}")
         return generate_text(f"{error_message}"), f"{error_message}", False
 
+    elif response['error'] == 'Not found':
+        return generate_text("Reverse proxy not found"), f"Reverse proxy not found {response}", False
+
     else:
         print(f"Unknown error: {response}")
-        return generate_text(f"Unknown Error"), f"{response}", False
+        return generate_text("Unknown Error"), f"{response}", False
 
 
 def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
