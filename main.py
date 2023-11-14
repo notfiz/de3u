@@ -6,6 +6,7 @@ import matplotlib
 import os
 import json
 import datetime
+import threading
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -16,6 +17,7 @@ matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
 
 cancel = False
+cancel_event = threading.Event()
 
 
 def load_config():
@@ -102,13 +104,26 @@ def get_metadata(img):
 
 
 def cancel_toggle():
-    global cancel
-    if not cancel:
+    global cancel_event
+    if not cancel_event.is_set():
         print("Canceling... please wait")
-    cancel = not cancel
+        cancel_event.set()
 
 
 def request_dalle(url, api_key, prompt, hd, size, style):
+    # Reset the cancel event at the start of each request
+    cancel_event.clear()
+    response_container = {'status': None, 'response': None}
+
+    def request_thread(u, d, h, r):
+        try:
+            response = requests.post(u, json=d, headers=h)
+            r['status'] = response.status_code
+            r['response'] = response.json()
+        except Exception as e:
+            r['status'] = None
+            r['response'] = e
+
     data = {
         "model": "dall-e-3",
         "prompt": prompt,
@@ -120,11 +135,18 @@ def request_dalle(url, api_key, prompt, hd, size, style):
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {api_key}'
     }
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        return response.status_code, response.json()
-    except Exception as e:
-        return None, e
+    thread = threading.Thread(target=request_thread, args=(url, data, headers, response_container))
+    thread.start()
+    while thread.is_alive():
+        if cancel_event.is_set():
+            print("Cancellation requested.")
+            break
+        thread.join(timeout=0.1)
+
+    if cancel_event.is_set():
+        return None, "Operation was cancelled by the user."
+    else:
+        return response_container['status'], response_container['response']
 
 
 def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
@@ -150,6 +172,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
         image_url = response['data'][0]['url']
         try:
+            print("generated. downloading...")
             image_response = requests.get(image_url)
             image_response.raise_for_status()
             image_bytes = image_response.content
@@ -158,7 +181,6 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             # should make this automatically retry the request a few times before failing later
             print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser")
             return generate_text("Error fetching image"), str(e), False
-
         # metadata stuff
         metadata = PngImagePlugin.PngInfo()
         generation_info_data = {
@@ -187,6 +209,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         print("Success.")
         return img_final, revised_prompt, True
 
+    # this is just hell. all of these needs to be refactored
     elif status == 401:
         print("Invalid api key.")
         return generate_text("Invalid API key"), "Invalid API key.", False
@@ -194,6 +217,8 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
     # image: This request has been blocked by our content filters.
     elif status == 400 or status == 429:
+        if 'error' not in response:
+            return generate_text("error"), response, False
         error_message = response['error']['message']
         # filtered
         if response['error']['code'] == "content_policy_violation":
@@ -206,7 +231,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             return generate_text("Filtered"), error_message, False
 
         # rate limited or quota issue
-        print(f"Error: {error_message}")
+        print(f"{error_message}")
         return generate_text(f"{error_message}"), f"{error_message}", False
 
     elif response['error'] == 'Not found':
