@@ -1,13 +1,13 @@
 import gradio as gr
 import requests
-from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
+from PIL import Image, PngImagePlugin
 import io
 import os
 import matplotlib
 import json
 import datetime
 import threading
-import webbrowser
+import utils
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -38,81 +38,11 @@ def save_config(api, total, proxy_url):
         file.flush()
 
 
-def generate_text(text, width=1000, height=250, color='black', font_color='white'):
-    img = Image.new('RGB', (width, height), color=color)
-    draw = ImageDraw.Draw(img)
-    font_size = 50
-    font_path = 'arial.ttf'
-
-    try:
-        font = ImageFont.truetype(font_path, size=font_size)
-    except IOError:
-        font = ImageFont.load_default()
-
-    text_width, text_height = draw.textbbox((0, 0), text, font=font)[2:]
-    while text_width > img.width - 20:
-        font_size -= 1
-        if font_size <= 5:
-            return generate_text("none")
-        font = ImageFont.truetype(font_path, size=font_size)
-        text_width, text_height = draw.textbbox((0, 0), text, font=font)[2:]
-
-    x = (img.width - text_width) / 2
-    y = (img.height - text_height) / 2
-    draw.text((x, y), text, font=font, fill=font_color)
-    return img
-
-
-def calculate_price(size, hd, count=1):
-    prices = {
-        '1024x1024': 0.04,
-        '1024x1792': 0.08,
-        '1792x1024': 0.08
-    }
-    hd_prices = {
-        '1024x1024': 0.08,
-        '1024x1792': 0.12,
-        '1792x1024': 0.12
-    }
-    price = hd_prices[size] if hd else prices[size]
-    return price * count
-
-
-def get_metadata(img):
-    metadata_str = ""
-    if img is None:
-        return "No image provided."
-    generation_info_raw = img.info.get("generation_info", "")
-    revised_prompt = img.info.get("revised_prompt", "")
-    try:
-        if generation_info_raw:
-            generation_info = json.loads(generation_info_raw)
-            metadata_str += "Generation Info:\n"
-            for key, value in generation_info.items():
-                metadata_str += f"{key}: {value}\n"
-        else:
-            metadata_str += "No generation info found.\n"
-    except json.JSONDecodeError:
-        # older/unsupported generation info
-        metadata_str += generation_info_raw + "\n"
-
-    if revised_prompt:
-        metadata_str += "\n\nRevised Prompt:\n" + revised_prompt
-    else:
-        metadata_str += "\n\nNo revised prompt found."
-
-    return metadata_str
-
-
 def cancel_toggle():
     global cancel_event
     if not cancel_event.is_set():
         print("Canceling... please wait")
         cancel_event.set()
-
-
-def show_output():
-    webbrowser.open(output)
 
 
 def request_dalle(url, api_key, prompt, hd, size, style):
@@ -170,7 +100,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
 
     if status is None:
         print(f"Error: {response}")
-        return generate_text("connection issue"), response, False
+        return utils.generate_text("connection issue"), response, False
 
     if status == 200:
         revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
@@ -184,7 +114,7 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         except requests.RequestException as e:
             # should make this automatically retry the request a few times before failing later
             print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser. the metadata will NOT be saved.")
-            return generate_text("Error fetching image"), str(e), False
+            return utils.generate_text("Error fetching image"), str(e), False
         # metadata stuff
         metadata = PngImagePlugin.PngInfo()
         generation_info_data = {
@@ -216,13 +146,13 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
     # this is just hell. all of these needs to be refactored
     elif status == 401:
         print("Invalid api key.")
-        return generate_text("Invalid API key"), "Invalid API key.", False
+        return utils.generate_text("Invalid API key"), "Invalid API key.", False
 
     # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
     # image: This request has been blocked by our content filters.
     elif status == 400 or status == 429:
         if 'error' not in response:
-            return generate_text("error"), response, False
+            return utils.generate_text("error"), response, False
         error_message = response['error']['message']
         # filtered
         if response['error']['code'] == "content_policy_violation":
@@ -232,18 +162,18 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
                 print("Filtered by image moderation. Your request may succeed if retried.")
             else:
                 print(f"Filtered. {error_message}")
-            return generate_text("Filtered"), error_message, False
+            return utils.generate_text("Filtered"), error_message, False
 
         # rate limited or quota issue
         print(f"{error_message}")
-        return generate_text(f"{error_message}"), f"{error_message}", False
+        return utils.generate_text(f"{error_message}"), f"{error_message}", False
 
     elif response['error'] == 'Not found':
-        return generate_text("Reverse proxy not found"), f"Reverse proxy not found {response}", False
+        return utils.generate_text("Reverse proxy not found"), f"Reverse proxy not found {response}", False
 
     else:
         print(f"Unknown error: {response}")
-        return generate_text("Unknown Error"), f"{response}", False
+        return utils.generate_text("Unknown Error"), f"{response}", False
 
 
 def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
@@ -264,7 +194,7 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
-            price += calculate_price(size, hd)
+            price += utils.calculate_price(size, hd)
 
     _, total, _ = load_config()
     total += price
@@ -302,7 +232,7 @@ with gr.Blocks(title="de3u") as instance:
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
 
     metadata_image.change(
-        fn=get_metadata,
+        fn=utils.get_metadata,
         inputs=[metadata_image],
         outputs=[metadata_output],
         show_progress="hidden"
@@ -316,7 +246,7 @@ with gr.Blocks(title="de3u") as instance:
         fn=cancel_toggle
     )
     output_button.click(
-        fn=show_output
+        fn=utils.show_output
     )
 
 instance.launch(inbrowser=True)
