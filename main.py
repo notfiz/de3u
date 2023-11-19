@@ -7,7 +7,7 @@ import matplotlib
 import json
 import datetime
 import threading
-import utils
+import utils, error_handler
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -99,8 +99,8 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         status, response = request_dalle(proxy_url, api_key, prompt, hd, size, style)
 
     if status is None:
-        print(f"Error: {response}")
-        return utils.generate_text("connection issue"), response, False
+        error_message, success = error_handler.handle_connection(response)
+        return utils.generate_text(error_message), error_message, success
 
     if status == 200:
         revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
@@ -143,37 +143,9 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         print("Success.")
         return img_final, revised_prompt, True
 
-    # this is just hell. all of these needs to be refactored
-    elif status == 401:
-        print("Invalid api key.")
-        return utils.generate_text("Invalid API key"), "Invalid API key.", False
-
-    # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
-    # image: This request has been blocked by our content filters.
-    elif status == 400 or status == 429:
-        if 'error' not in response:
-            return utils.generate_text("error"), response, False
-        error_message = response['error']['message']
-        # filtered
-        if response['error']['code'] == "content_policy_violation":
-            if "Your prompt may contain text" in error_message and not proxy:
-                print("Filtered by text moderation. You need to modify your prompt.")
-            elif "Image descriptions generated" in error_message and not proxy:
-                print("Filtered by image moderation. Your request may succeed if retried.")
-            else:
-                print(f"Filtered. {error_message}")
-            return utils.generate_text("Filtered"), error_message, False
-
-        # rate limited or quota issue
-        print(f"{error_message}")
-        return utils.generate_text(f"{error_message}"), f"{error_message}", False
-
-    elif response['error'] == 'Not found':
-        return utils.generate_text("Reverse proxy not found"), f"Reverse proxy not found {response}", False
-
     else:
-        print(f"Unknown error: {response}")
-        return utils.generate_text("Unknown Error"), f"{response}", False
+        error_message, success = error_handler.handle_openai(status, response, proxy)
+        return utils.generate_text(error_message), error_message, success
 
 
 def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
