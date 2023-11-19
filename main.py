@@ -2,11 +2,12 @@ import gradio as gr
 import requests
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import io
-import matplotlib
 import os
+import matplotlib
 import json
 import datetime
 import threading
+import webbrowser
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -110,8 +111,11 @@ def cancel_toggle():
         cancel_event.set()
 
 
+def show_output():
+    webbrowser.open(output)
+
+
 def request_dalle(url, api_key, prompt, hd, size, style):
-    # Reset the cancel event at the start of each request
     cancel_event.clear()
     response_container = {'status': None, 'response': None}
 
@@ -173,13 +177,13 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         image_url = response['data'][0]['url']
         try:
             print("generated. downloading...")
-            image_response = requests.get(image_url)
+            image_response = requests.get(image_url, timeout=200)
             image_response.raise_for_status()
             image_bytes = image_response.content
             image = Image.open(io.BytesIO(image_bytes))
         except requests.RequestException as e:
             # should make this automatically retry the request a few times before failing later
-            print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser")
+            print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser. the metadata will NOT be saved.")
             return generate_text("Error fetching image"), str(e), False
         # metadata stuff
         metadata = PngImagePlugin.PngInfo()
@@ -252,7 +256,7 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
 
     for i in range(count):
         if cancel:
-            print("operation cancelled.")
+            print("Operation cancelled.")
             cancel_toggle()
             break
 
@@ -291,6 +295,7 @@ with gr.Blocks(title="de3u") as instance:
                 image_output = gr.Gallery()
                 revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
                 price_output = gr.Textbox(label="Price")
+                output_button = gr.Button("Show Output Folder")
     with tab_metadata:
         with gr.Row():
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
@@ -308,7 +313,10 @@ with gr.Blocks(title="de3u") as instance:
         outputs=[image_output, revised_prompt_output, price_output]
     )
     cancel_button.click(
-        fn=cancel_toggle,
+        fn=cancel_toggle
+    )
+    output_button.click(
+        fn=show_output
     )
 
 instance.launch(inbrowser=True)
