@@ -209,12 +209,12 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             file_path = os.path.join(folder_path, f"img_{file_number}.png")
         img_final.save(file_path, "PNG", pnginfo=metadata)
 
-        print("Success.")
+        print("success.")
         return img_final, revised_prompt, True
 
     # this is just hell. all of these needs to be refactored
     elif status == 401:
-        print("Invalid api key.")
+        print("Invalid API key.")
         return generate_text("Invalid API key"), "Invalid API key.", False
 
     # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
