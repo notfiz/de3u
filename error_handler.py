@@ -1,7 +1,11 @@
 def handle_openai(status, response, proxy):
     if status == 401:
-        print("Invalid API key.")
-        return "Invalid API key.", False
+        if proxy:
+            print("Invalid proxy password.")
+            return "invalid proxy password.", False
+        else:
+            print("Invalid API key.")
+            return "invalid API key.", False
 
     elif status == 400 or status == 429:
         if 'error' not in response:
@@ -17,7 +21,7 @@ def handle_openai(status, response, proxy):
                 print("Filtered by image moderation. Your request may succeed if retried.")
             else:
                 print(f"Filtered. {error_message}")
-            return "Filtered", False
+            return "filtered", False
 
         # rate limited or quota issues
         print(f"{error_message}")

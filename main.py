@@ -1,12 +1,13 @@
 import gradio as gr
 import requests
-from PIL import Image, PngImagePlugin
+from PIL import Image
 import io
 import os
 import matplotlib
 import json
 import datetime
 import threading
+import webbrowser
 import utils, error_handler
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
@@ -19,6 +20,10 @@ os.makedirs(output, exist_ok=True)
 
 cancel = False
 cancel_event = threading.Event()
+
+
+def show_output():
+    webbrowser.open(output)
 
 
 def load_config():
@@ -116,23 +121,18 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser. the metadata will NOT be saved.")
             return utils.generate_text("Error fetching image"), str(e), False
         # metadata stuff
-        metadata = PngImagePlugin.PngInfo()
         generation_info_data = {
             "prompt": prompt,
             "size": size,
             "hd": hd,
             "style": style,
         }
-        metadata.add_text("generation_info", json.dumps(generation_info_data))
-        metadata.add_text("revised_prompt", revised_prompt)
-        buffer = io.BytesIO()
-        image.save(buffer, "PNG", pnginfo=metadata)
-        buffer.seek(0)
-        img_final = Image.open(buffer)
+
+        img_final, metadata = utils.add_metadata(image, generation_info_data, revised_prompt)
+
         # saving stuff
         folder_path = os.path.join(output, datetime.datetime.now().strftime('%Y-%m-%d'))
         os.makedirs(folder_path, exist_ok=True)
-
         file_number = 0
         file_path = os.path.join(folder_path, f"img_{file_number}.png")
         while os.path.exists(file_path):
@@ -171,7 +171,7 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     _, total, _ = load_config()
     total += price
     save_config(api_key, total, proxy_url)
-    print("Done.")
+    print("done.")
     return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
 
@@ -218,7 +218,7 @@ with gr.Blocks(title="de3u") as instance:
         fn=cancel_toggle
     )
     output_button.click(
-        fn=utils.show_output
+        fn=show_output,
     )
 
 instance.launch(inbrowser=True)

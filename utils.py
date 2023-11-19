@@ -1,6 +1,6 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import json
-import webbrowser
+import io
 
 
 def generate_text(text, width=1000, height=250, color='black', font_color='white'):
@@ -69,5 +69,12 @@ def get_metadata(img):
     return metadata_str
 
 
-def show_output(output):
-    webbrowser.open(output)
+def add_metadata(img, generation_info, revised_prompt):
+    metadata = PngImagePlugin.PngInfo()
+    metadata.add_text("generation_info", json.dumps(generation_info))
+    metadata.add_text("revised_prompt", revised_prompt)
+    buffer = io.BytesIO()
+    img.save(buffer, "PNG", pnginfo=metadata)
+    buffer.seek(0)
+    img_final = Image.open(buffer)
+    return img_final, metadata
