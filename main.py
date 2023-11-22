@@ -111,13 +111,12 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
         image_url = response['data'][0]['url']
         try:
-            print("generated. downloading...")
+            print(f"generated. {image_url} downloading...")
             image_response = requests.get(image_url, timeout=200)
             image_response.raise_for_status()
             image_bytes = image_response.content
             image = Image.open(io.BytesIO(image_bytes))
         except requests.RequestException as e:
-            # should make this automatically retry the request a few times before failing later
             print(f"Error fetching image from URL: {e}\n URL:{image_url}\n the image might still be retrievable manually by pasting the URL in a browser. the metadata will NOT be saved.")
             return utils.generate_text("Error fetching image"), str(e), False
         # metadata stuff
@@ -127,7 +126,6 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
             "hd": hd,
             "style": style,
         }
-
         img_final, metadata = utils.add_metadata(image, generation_info_data, revised_prompt)
 
         # saving stuff
