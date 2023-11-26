@@ -1,3 +1,4 @@
+import time
 def handle_openai(status, response, proxy):
     if status == 401:
         if proxy:
@@ -25,6 +26,10 @@ def handle_openai(status, response, proxy):
 
         # rate limited or quota issues
         print(f"{error_message}")
+        if status == 429 and "rate limit" in error_message:
+            # 60 is too extreme since each generation takes more than 20 seconds.
+            print("Rate limited. Sleeping for 30 seconds.")
+            time.sleep(30)
         return f"{error_message}", False
 
     elif response.get('error') == 'Not found':
