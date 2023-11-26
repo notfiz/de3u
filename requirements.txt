@@ -3,3 +3,4 @@ requests
 Pillow
 matplotlib
 setuptools
+simpleaudio
