@@ -12,8 +12,8 @@ import utils, error_handler
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
-config = 'config.json'
-output = 'output'
+config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+output = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
 
 matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
