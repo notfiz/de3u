@@ -1,6 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import json
 import io
+import os
+import simpleaudio
 
 
 def generate_text(text, width=1000, height=250, color='black', font_color='white'):
@@ -78,3 +80,11 @@ def add_metadata(img, generation_info, revised_prompt):
     buffer.seek(0)
     img_final = Image.open(buffer)
     return img_final, metadata
+
+
+def ding():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'resources/audio/ding.wav'))
+    try:
+        simpleaudio.WaveObject.from_wave_file(path).play()
+    except Exception as e:
+        print(f"An error occurred while trying to play the sound: {e}")

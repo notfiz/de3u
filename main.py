@@ -165,6 +165,7 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
             price += utils.calculate_price(size, hd)
+            utils.ding()
 
     _, total, _ = load_config()
     total += price
