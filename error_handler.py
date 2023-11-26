@@ -1,18 +1,20 @@
 import time
+
+
 def handle_openai(status, response, proxy):
     if status == 401:
         if proxy:
             print("Invalid proxy password.")
-            return "invalid proxy password.", False
+            return "invalid proxy password", False
         else:
             print("Invalid API key.")
-            return "invalid API key.", False
+            return "invalid API key", False
 
     elif status == 400 or status == 429:
         if 'error' not in response:
             return "error", False
         error_message = response['error']['message']
-        # different messages for different kinds of filters that gets triggered. doesn't work on reverse proxy.
+        # different messages for different kinds of filters that gets triggered. doesn't work on reverse proxies.
         # text: Your request was rejected as a result of our safety system. Your prompt may contain text that is not allowed by our safety system.
         # image: This request has been blocked by our content filters.
         if response['error']['code'] == "content_policy_violation":
