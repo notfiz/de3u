@@ -1,7 +1,7 @@
 import time
 
 
-def handle_openai(status, response, proxy):
+def handle_openai(status, response, proxy, cancel_event):
     if status == 401:
         if proxy:
             print("Invalid proxy password.")
@@ -31,7 +31,11 @@ def handle_openai(status, response, proxy):
         if status == 429 and "rate limit" in error_message:
             # 60 is too extreme since each generation takes more than 20 seconds.
             print("Rate limited. Sleeping for 30 seconds.")
-            time.sleep(30)
+            for _ in range(30):
+                # check for the cancel event.
+                if cancel_event.is_set():
+                    break
+                time.sleep(1)
         return f"{error_message}", False
 
     elif response.get('error') == 'Not found':

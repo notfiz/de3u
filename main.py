@@ -20,6 +20,7 @@ os.makedirs(output, exist_ok=True)
 
 cancel = False
 cancel_event = threading.Event()
+image_history = []
 
 
 def show_output():
@@ -142,11 +143,12 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         return img_final, revised_prompt, True
 
     else:
-        error_message, success = error_handler.handle_openai(status, response, proxy)
+        error_message, success = error_handler.handle_openai(status, response, proxy, cancel_event)
         return utils.generate_text(error_message), error_message, success
 
 
 def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
+    global image_history
     images = []
     revised_prompts = ""
     count = int(count)
@@ -164,6 +166,8 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
+            image_history.insert(0, (img_final, prompt))
+            image_history = image_history[:10]
             price += utils.calculate_price(size, hd)
             utils.ding()
 
@@ -174,10 +178,16 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
 
 
+def refresh_history():
+    images, prompts = zip(*image_history) if image_history else ([], [])
+    return images, "\n".join(prompts)
+
+
 with gr.Blocks(title="de3u") as instance:
     gr.Markdown("# de3u")
     tab_main = gr.TabItem("Image generator")
     tab_metadata = gr.TabItem("Image Metadata")
+    tab_history = gr.TabItem("History")
     with tab_main:
         with gr.Row():
             with gr.Column():
@@ -201,7 +211,17 @@ with gr.Blocks(title="de3u") as instance:
         with gr.Row():
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
+    with tab_history:
+        with gr.Row():
+            history_gallery = gr.Gallery(label="Image History", )
+            history_prompts = gr.Textbox(label="Prompts", lines=10, interactive=False)
 
+    tab_history.select(
+        fn=refresh_history,
+        inputs=[],
+        outputs=[history_gallery, history_prompts],
+        show_progress="hidden"
+    )
     metadata_image.change(
         fn=utils.get_metadata,
         inputs=[metadata_image],
