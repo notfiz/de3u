@@ -185,9 +185,9 @@ def refresh_history():
 
 with gr.Blocks(title="de3u") as instance:
     gr.Markdown("# de3u")
-    tab_main = gr.TabItem("Image generator")
+    tab_main = gr.TabItem("Image Generator")
     tab_metadata = gr.TabItem("Image Metadata")
-    tab_history = gr.TabItem("History")
+    tab_history = gr.TabItem("Image History")
     with tab_main:
         with gr.Row():
             with gr.Column():
