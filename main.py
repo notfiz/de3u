@@ -46,7 +46,7 @@ def cancel_toggle():
         cancel_event.set()
 
 
-def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
+def oai_main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     global image_history
     images = []
     revised_prompts = ""
@@ -84,28 +84,29 @@ def refresh_history():
 
 with gr.Blocks(title="de3u") as instance:
     gr.Markdown("# de3u")
-    tab_main = gr.TabItem("Image Generator")
+    tab_oai = gr.TabItem("Dall-e Generator")
+    tab_nai = gr.TabItem("Nai Generator")
     tab_metadata = gr.TabItem("Image Metadata")
     tab_history = gr.TabItem("Image History")
-    with tab_main:
+    with tab_oai:
         with gr.Row():
             with gr.Column():
-                proxy_url_input = gr.Textbox(label="Reverse proxy Link", placeholder="Enter reverse proxy link if needed", value=load_config()[2])
-                api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
-                prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
-                hd_input = gr.Checkbox(label="HD")
-                jb_input = gr.Checkbox(label="JB", info="makes the ai less likely to change your input. more likely to get filtered. useful if you are using an already revised prompt.")
-                size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
-                style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+                oai_proxy_url_input = gr.Textbox(label="Reverse proxy Link", placeholder="Enter reverse proxy link if needed", value=load_config()[2])
+                oai_api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
+                oai_prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
+                oai_hd_input = gr.Checkbox(label="HD")
+                oai_jb_input = gr.Checkbox(label="JB", info="makes the ai less likely to change your input. more likely to get filtered. useful if you are using an already revised prompt.")
+                oai_size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
+                oai_style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
                 with gr.Row():
-                    generate_button = gr.Button("Generate")
-                    cancel_button = gr.Button("Cancel")
-                    num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
+                    oai_generate_button = gr.Button("Generate")
+                    oai_cancel_button = gr.Button("Cancel")
+                    oai_num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
             with gr.Column():
-                image_output = gr.Gallery()
-                revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
-                price_output = gr.Textbox(label="Price")
-                output_button = gr.Button("Show Output Folder")
+                oai_image_output = gr.Gallery()
+                oai_revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
+                oai_price_output = gr.Textbox(label="Price")
+                oai_output_button = gr.Button("Show Output Folder")
     with tab_metadata:
         with gr.Row():
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
@@ -127,15 +128,15 @@ with gr.Blocks(title="de3u") as instance:
         outputs=[metadata_output],
         show_progress="hidden"
     )
-    generate_button.click(
-        fn=main,
-        inputs=[proxy_url_input, api_key_input, prompt_input, hd_input, jb_input, size_input, style_input, num_images_input],
-        outputs=[image_output, revised_prompt_output, price_output]
+    oai_generate_button.click(
+        fn=oai_main,
+        inputs=[oai_proxy_url_input, oai_api_key_input, oai_prompt_input, oai_hd_input, oai_jb_input, oai_size_input, oai_style_input, oai_num_images_input],
+        outputs=[oai_image_output, oai_revised_prompt_output, oai_price_output]
     )
-    cancel_button.click(
+    oai_cancel_button.click(
         fn=cancel_toggle
     )
-    output_button.click(
+    oai_output_button.click(
         fn=show_output,
     )
 
