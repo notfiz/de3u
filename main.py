@@ -6,7 +6,9 @@ import threading
 import webbrowser
 import utils, oai
 
-image_sizes = ['1024x1024', '1024x1792', '1792x1024']
+oai_sizes = ['1024x1024', '1024x1792', '1792x1024']
+nai_sizes = ['832x1216', '1216x832', '1024x1024', '1536x1024', '1472x1472', '1088x1920', '1920x1088', '512x768', '768x512', '640x640']
+nai_samplers = ['Euler', 'Euler Ancestral', 'DPM++ 2S Ancestral', 'DPM++ 2M', 'DDIM']
 config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
 output = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
 
@@ -91,29 +93,45 @@ with gr.Blocks(title="de3u") as instance:
     with tab_oai:
         with gr.Row():
             with gr.Column():
-                oai_proxy_url_input = gr.Textbox(label="Reverse proxy Link", placeholder="Enter reverse proxy link if needed", value=load_config()[2])
-                oai_api_key_input = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
-                oai_prompt_input = gr.Textbox(label="Prompt", placeholder="Enter your prompt")
-                oai_hd_input = gr.Checkbox(label="HD")
-                oai_jb_input = gr.Checkbox(label="JB", info="makes the ai less likely to change your input. more likely to get filtered. useful if you are using an already revised prompt.")
-                oai_size_input = gr.Dropdown(label="Size", choices=image_sizes, value=image_sizes[0], allow_custom_value=False)
-                oai_style_input = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
+                oai_proxy_url = gr.Textbox(label="Reverse proxy Link", placeholder="Enter reverse proxy link if needed", value=load_config()[2])
+                oai_api_key = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password", value=load_config()[0])
+                oai_prompt = gr.Textbox(label="Prompt", placeholder="Enter your prompt", lines=3)
+                oai_hd = gr.Checkbox(label="HD")
+                oai_jb = gr.Checkbox(label="JB", info="makes the ai less likely to change your input. more likely to get filtered. useful if you are using an already revised prompt.")
+                oai_size = gr.Dropdown(label="Size", choices=oai_sizes, value=oai_sizes[0], allow_custom_value=False)
+                oai_style = gr.Radio(label="Style", choices=['vivid', 'natural'], value='vivid')
                 with gr.Row():
                     oai_generate_button = gr.Button("Generate")
                     oai_cancel_button = gr.Button("Cancel")
                     oai_num_images_input = gr.Number(label="Number of Images", value=1, step=1, minimum=1, interactive=True)
             with gr.Column():
-                oai_image_output = gr.Gallery()
+                oai_image_output = gr.Gallery(label="Generated Images")
                 oai_revised_prompt_output = gr.Textbox(label="Revised Prompt", lines=10)
                 oai_price_output = gr.Textbox(label="Price")
                 oai_output_button = gr.Button("Show Output Folder")
+    with tab_nai:
+        with gr.Row():
+            with gr.Column():
+                nai_api_key = gr.Textbox(label="API Key", placeholder="Enter your API key", type="password")
+                nai_prompt = gr.Textbox(label="Prompt", placeholder="Enter your prompt", lines=3)
+                nai_neg_prompt = gr.Textbox(label="Undesired Content", placeholder="Enter your negative prompt", lines=3)
+                nai_size = gr.Dropdown(label="Size", choices=nai_sizes, value=nai_sizes[0], allow_custom_value=False, interactive=True)
+                with gr.Row():
+                    nai_steps = gr.Slider(label="Steps", value=28, step=1, minimum=1, maximum=50, interactive=True)
+                    nai_guide = gr.Slider(label="Prompt Guidance", value=5, step=0.1, minimum=0, maximum=10, interactive=True)
+                    nai_sampler = gr.Dropdown(label="Sampler", choices=nai_samplers, value=nai_samplers[0], interactive=True)
+                with gr.Row():
+                    nai_generate = gr.Button()
+            with gr.Row():
+                nai_gallery = gr.Gallery()
+
     with tab_metadata:
         with gr.Row():
             metadata_image = gr.Image(type="pil", width=500, height=500, sources=["upload", "clipboard"])
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
     with tab_history:
         with gr.Row():
-            history_gallery = gr.Gallery(label="Image History", )
+            history_gallery = gr.Gallery(label="Image History")
             history_prompts = gr.Textbox(label="Prompts", lines=10, interactive=False)
 
     tab_history.select(
@@ -130,7 +148,7 @@ with gr.Blocks(title="de3u") as instance:
     )
     oai_generate_button.click(
         fn=oai_main,
-        inputs=[oai_proxy_url_input, oai_api_key_input, oai_prompt_input, oai_hd_input, oai_jb_input, oai_size_input, oai_style_input, oai_num_images_input],
+        inputs=[oai_proxy_url, oai_api_key, oai_prompt, oai_hd, oai_jb, oai_size, oai_style, oai_num_images_input],
         outputs=[oai_image_output, oai_revised_prompt_output, oai_price_output]
     )
     oai_cancel_button.click(
@@ -140,4 +158,4 @@ with gr.Blocks(title="de3u") as instance:
         fn=show_output,
     )
 
-instance.launch(inbrowser=True, show_api=False)
+instance.launch(inbrowser=False, show_api=False)
