@@ -87,7 +87,7 @@ def refresh_history():
 with gr.Blocks(title="de3u") as instance:
     gr.Markdown("# de3u")
     tab_oai = gr.TabItem("Dall-e Generator")
-    tab_nai = gr.TabItem("Nai Generator")
+    tab_nai = gr.TabItem("NovelAI Generator")
     tab_metadata = gr.TabItem("Image Metadata")
     tab_history = gr.TabItem("Image History")
     with tab_oai:
