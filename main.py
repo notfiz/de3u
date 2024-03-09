@@ -73,7 +73,8 @@ def request_dalle(url, api_key, prompt, hd, size, style):
     }
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Bearer {api_key}'
+        'Authorization': f'Bearer {api_key}',
+        'api-key': api_key
     }
     thread = threading.Thread(target=request_thread, args=(url, data, headers, response_container))
     thread.start()
