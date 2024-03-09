@@ -110,8 +110,12 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         return utils.generate_text(error_message), error_message, success
 
     if status == 200:
-        revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
-        image_url = response['data'][0]['url']
+        print(response)
+        try:
+            revised_prompt = response['data'][0].get('revised_prompt', 'No revised prompt provided.')
+            image_url = response['data'][0]['url']
+        except KeyError:
+            return utils.generate_text("unknown error"), str(response), False
         try:
             print(f"generated:{image_url} downloading...")
             image_response = requests.get(image_url, timeout=200)
