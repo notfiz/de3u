@@ -19,7 +19,6 @@ icon = os.path.abspath(os.path.join(os.path.dirname(__file__), "resources/image/
 matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
 
-cancel = False
 cancel_event = threading.Event()
 image_history = []
 
@@ -82,10 +81,12 @@ def request_dalle(url, api_key, prompt, hd, size, style):
     while thread.is_alive():
         if cancel_event.is_set():
             print("Cancellation requested.")
+            cancel_event.clear()
             break
         thread.join(timeout=0.1)
 
     if cancel_event.is_set():
+        cancel_event.clear()
         return None, "Operation was cancelled by the user."
     else:
         return response_container['status'], response_container['response']
@@ -162,29 +163,35 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     revised_prompts = ""
     count = int(count)
     price = 0
-    if cancel:
-        cancel_toggle()
 
     for i in range(count):
-        if cancel:
-            print("Operation cancelled")
-            cancel_toggle()
+        # Check if a cancel has been requested before starting to process a new image.
+        if cancel_event.is_set():
+            print("Operation cancelled.")
+            cancel_event.clear()
             break
 
         img_final, revised_prompt, success = generate_image(proxy_url, api_key, prompt, hd, jb, size, style)
+
+        # do a recheck just to make sure
+        if cancel_event.is_set():
+            print("Operation cancelled during image generation.")
+            cancel_event.clear()
+            break
+
         images.append(img_final)
         revised_prompts += f"{i + 1}- {revised_prompt}\n"
         if success:
             image_history.insert(0, (img_final, prompt))
             image_history = image_history[:10]
             price += utils.calculate_price(size, hd)
-            utils.ding()
+            utils.ding()  # Assuming this is quick enough not to need an interrupt check. needs testing.
 
     _, total, _ = load_config()
     total += price
     save_config(api_key, total, proxy_url)
     print("Done")
-    return images, revised_prompts, f"price for this batch:${price:.2f}, total generated:${total:.2f}"
+    return images, revised_prompts, f"Price for this batch: ${price:.2f}, Total generated: ${total:.2f}"
 
 
 def refresh_history():
