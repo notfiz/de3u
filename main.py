@@ -9,6 +9,7 @@ import datetime
 import threading
 import webbrowser
 import utils, error_handler
+from tqdm import tqdm
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
@@ -92,7 +93,7 @@ def request_dalle(url, api_key, prompt, hd, size, style):
         return response_container['status'], response_container['response']
 
 
-def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
+def generate_image(proxy_url, api_key, prompt, hd, jb, size, style, progress=gr.Progress(track_tqdm=True)):
     proxy = False
     print("generating...")
     if jb:
@@ -122,10 +123,21 @@ def generate_image(proxy_url, api_key, prompt, hd, jb, size, style):
         # download and add metadata
         try:
             print(f"Generated: {image_url} \nDownloading...")
-            image_response = requests.get(image_url, timeout=200)
-            image_response.raise_for_status()
-            image_bytes = image_response.content
-            image = Image.open(io.BytesIO(image_bytes))
+            progress(0)
+            with requests.get(image_url, stream=True, timeout=200) as r:
+                r.raise_for_status()
+                total = int(r.headers.get('content-length', 0))
+                block_size = 1024  #
+                progress_bar = tqdm(total=total, unit='iB', unit_scale=True)
+                progress.tqdm(progress_bar, total=total, unit='', desc='downloading...')
+                image_bytes = io.BytesIO()
+                for data in r.iter_content(block_size):
+                    progress_bar.update(len(data))
+                    progress.update(len(data))
+                    image_bytes.write(data)
+                progress_bar.close()
+            image_bytes.seek(0)
+            image = Image.open(image_bytes)
         except requests.RequestException as e:
             print(f"Failed to retrieve image from the provided URL: {e}. \nYou may manually access the image by visiting {image_url} in your browser. Please note, image metadata will not be saved.")
             return utils.generate_text("error fetching image"), str(e), False
@@ -229,7 +241,7 @@ with gr.Blocks(title="de3u") as instance:
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
     with tab_history:
         with gr.Row():
-            history_gallery = gr.Gallery(label="Image History", )
+            history_gallery = gr.Gallery(label="Image History")
             history_prompts = gr.Textbox(label="Prompts", lines=10, interactive=False)
 
     tab_history.select(
