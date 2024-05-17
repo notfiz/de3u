@@ -185,7 +185,6 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
             image_history.insert(0, (img_final, prompt))
             image_history = image_history[:10]
             price += utils.calculate_price(size, hd)
-            utils.ding()  # Assuming this is quick enough not to need an interrupt check. needs testing.
 
     _, total, _ = load_config()
     total += price
