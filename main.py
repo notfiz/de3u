@@ -12,9 +12,13 @@ import utils, error_handler
 
 image_sizes = ['1024x1024', '1024x1792', '1792x1024']
 openai_url = 'https://api.openai.com/v1/images/generations'
-config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
-output = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
-icon = os.path.abspath(os.path.join(os.path.dirname(__file__), "resources/image/desu.png"))
+
+config = utils.get_path('config.json')
+output = utils.get_path('output')
+icon = utils.get_path('resources/image/desu.png')
+ding = utils.get_path('resources/audio/ding.wav')
+
+args = utils.parse_arguments()
 
 matplotlib.use('Agg')
 os.makedirs(output, exist_ok=True)
@@ -34,6 +38,7 @@ def load_config():
             api_key = data.get('api_key', '')
             total_spent = float(data.get('total_spent', 0))
             proxy_url = data.get('proxy_url', '')
+            file.close()
             return api_key, total_spent, proxy_url
     return '', 0, ''
 
@@ -190,6 +195,7 @@ def main(proxy_url, api_key, prompt, hd, jb, size, style, count):
     total += price
     save_config(api_key, total, proxy_url)
     print("Done")
+    utils.play_sound(ding, args.no_sound)
     return images, revised_prompts, f"Price for this batch: ${price:.2f}, Total generated: ${total:.2f}"
 
 
@@ -228,7 +234,7 @@ with gr.Blocks(title="de3u") as instance:
             metadata_output = gr.Textbox(label="Metadata", interactive=False)
     with tab_history:
         with gr.Row():
-            history_gallery = gr.Gallery(label="Image History", )
+            history_gallery = gr.Gallery(label="Image History")
             history_prompts = gr.Textbox(label="Prompts", lines=10, interactive=False)
 
     tab_history.select(
@@ -255,4 +261,7 @@ with gr.Blocks(title="de3u") as instance:
         fn=show_output,
     )
 
-instance.launch(inbrowser=True, favicon_path=icon)
+instance.launch(inbrowser=not args.no_browser,
+                server_port=args.port,
+                debug=args.debug,
+                favicon_path=icon)

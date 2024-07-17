@@ -2,6 +2,8 @@ from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 import json
 import io
 import os
+import argparse
+import platform
 
 
 def generate_text(text, width=1000, height=250, color='black', font_color='white'):
@@ -79,3 +81,30 @@ def add_metadata(img, generation_info, revised_prompt):
     buffer.seek(0)
     img_final = Image.open(buffer)
     return img_final, metadata
+
+
+def get_path(path):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="DALL-E 3 Image Generator")
+    parser.add_argument('--no-browser', '-nb', action='store_true',
+                        help="Don't open the browser automatically", default=False)
+    parser.add_argument('--port', '-p', type=int, default=7860,
+                        help="Port to run the Gradio app on")
+    parser.add_argument('--debug', '-d', action='store_true',
+                        help="Run in debug mode")
+    parser.add_argument('--no-sound', '-ns', action='store_true',
+                        help="Disable sound effects")
+    return parser.parse_args()
+
+
+def play_sound(sound_path, no_sound):
+    if no_sound:
+        return
+    if platform.system() == 'Windows':
+        import winsound
+        winsound.PlaySound(sound_path, winsound.SND_FILENAME)
+    else:
+        print("Sound playback is not supported on this platform. consider using the --no-sound flag")
