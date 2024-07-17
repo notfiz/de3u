@@ -11,9 +11,21 @@ linux/macos:
 you already know what you are doing. run main.py after installing the dependencies.
 
 # features
-- easy to use
 - automatically adds the generation info to the metadata
 - metadata viewer
 - can be connected to an openai reverse proxy
 - multiple image generations
 - keeps track of the money spent
+
+# optional arguments
+`--no-browser -nb`
+
+Don't open the browser automatically
+
+`--port -p`
+
+Port to run the Gradio app on
+
+`--no-sound -ns`
+
+Disable sound effects
