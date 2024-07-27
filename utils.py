@@ -106,5 +106,8 @@ def play_sound(sound_path, no_sound):
     if platform.system() == 'Windows':
         import winsound
         winsound.PlaySound(sound_path, winsound.SND_FILENAME)
+    elif os.name == 'posix':
+        import sys
+        sys.stdout.write('\a\n')
     else:
         print("Sound playback is not supported on this platform. consider using the --no-sound flag")
